@@ -81,3 +81,81 @@ export function getPublicEnv(): PublicEnv {
   cachedPublicEnv = parsed.data;
   return cachedPublicEnv;
 }
+
+const aiEnvSchema = z.object({
+  GEMINI_API_KEY: z.string().min(1),
+});
+
+export type AiEnv = z.infer<typeof aiEnvSchema>;
+
+export function getAiEnv(): AiEnv {
+  const parsed = aiEnvSchema.safeParse({
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+  });
+
+  if (!parsed.success) {
+    throw new Error(
+      `Invalid AI environment configuration: ${formatEnvErrors(parsed.error)}`,
+    );
+  }
+
+  return parsed.data;
+}
+
+const emailEnvSchema = z.object({
+  RESEND_API_KEY: z.string().min(1),
+  EMAIL_FROM: z.string().email(),
+});
+
+export type EmailEnv = z.infer<typeof emailEnvSchema>;
+
+export function getEmailEnv(): EmailEnv {
+  const parsed = emailEnvSchema.safeParse({
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    EMAIL_FROM: process.env.EMAIL_FROM,
+  });
+
+  if (!parsed.success) {
+    throw new Error(
+      `Invalid email environment configuration: ${formatEnvErrors(parsed.error)}`,
+    );
+  }
+
+  return parsed.data;
+}
+
+const cronEnvSchema = z.object({
+  CRON_SECRET: z.string().min(1),
+});
+
+export function getCronSecret(): string {
+  const parsed = cronEnvSchema.safeParse({
+    CRON_SECRET: process.env.CRON_SECRET,
+  });
+
+  if (!parsed.success) {
+    throw new Error(
+      `Invalid cron environment configuration: ${formatEnvErrors(parsed.error)}`,
+    );
+  }
+
+  return parsed.data.CRON_SECRET;
+}
+
+const webhookEnvSchema = z.object({
+  WEBHOOK_SECRET: z.string().min(1),
+});
+
+export function getWebhookSecret(): string {
+  const parsed = webhookEnvSchema.safeParse({
+    WEBHOOK_SECRET: process.env.WEBHOOK_SECRET,
+  });
+
+  if (!parsed.success) {
+    throw new Error(
+      `Invalid webhook environment configuration: ${formatEnvErrors(parsed.error)}`,
+    );
+  }
+
+  return parsed.data.WEBHOOK_SECRET;
+}

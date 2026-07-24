@@ -8,15 +8,12 @@ import {
 } from "@/constants/pagination";
 import { LEAD_STATUSES, RESEARCH_STATUSES } from "@/types/lead";
 
-const optionalUrl = z
-  .union([z.string().url(), z.literal(""), z.null()])
-  .optional()
-  .transform((value) => {
-    if (value === "" || value === undefined) {
-      return null;
-    }
-    return value;
-  });
+const optionalUrl = z.preprocess((value) => {
+  if (value === "") {
+    return null;
+  }
+  return value;
+}, z.string().url().nullable().optional());
 
 export const leadStatusSchema = z.enum(LEAD_STATUSES);
 export const researchStatusSchema = z.enum(RESEARCH_STATUSES);

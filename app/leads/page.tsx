@@ -17,6 +17,7 @@ type Lead = {
   firstName: string | null;
   lastName: string | null;
   leadStatus: string;
+  researchStatus: string;
   campaignId: string;
 };
 
@@ -187,6 +188,68 @@ export default function LeadsPage() {
     }
   }
 
+  async function handleResearch(leadId: string) {
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/v1/research/${leadId}`, {
+        method: "POST",
+      });
+      await readJson(response);
+      setMessage("Research generated");
+      await loadData();
+    } catch (researchError) {
+      setError(
+        researchError instanceof Error
+          ? researchError.message
+          : "Research failed",
+      );
+    }
+  }
+
+  async function handleGenerateEmail(leadId: string) {
+    setError(null);
+    setMessage(null);
+    try {
+      const generated = await readJson<{
+        success: true;
+        data: { id: string };
+      }>(
+        await fetch("/api/v1/emails/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ leadId }),
+        }),
+      );
+
+      const queued = await readJson<{
+        success: true;
+        data: { id: string };
+      }>(
+        await fetch("/api/v1/emails/queue", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ generatedEmailId: generated.data.id }),
+        }),
+      );
+
+      await readJson(
+        await fetch("/api/v1/emails/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ queueId: queued.data.id }),
+        }),
+      );
+
+      setMessage("Email generated, queued, and sent (or simulated locally)");
+      await loadData();
+    } catch (emailError) {
+      setError(
+        emailError instanceof Error ? emailError.message : "Email flow failed",
+      );
+    }
+  }
+
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-6 py-10">
       <header className="flex items-start justify-between gap-4">
@@ -300,7 +363,8 @@ export default function LeadsPage() {
                   <th className="py-2 pr-4 font-medium">Company</th>
                   <th className="py-2 pr-4 font-medium">Name</th>
                   <th className="py-2 pr-4 font-medium">Email</th>
-                  <th className="py-2 pr-4 font-medium">Status</th>
+                  <th className="py-2 pr-4 font-medium">Lead</th>
+                  <th className="py-2 pr-4 font-medium">Research</th>
                   <th className="py-2 font-medium">Actions</th>
                 </tr>
               </thead>
@@ -314,14 +378,31 @@ export default function LeadsPage() {
                     </td>
                     <td className="py-2 pr-4">{lead.email}</td>
                     <td className="py-2 pr-4">{lead.leadStatus}</td>
+                    <td className="py-2 pr-4">{lead.researchStatus}</td>
                     <td className="py-2">
-                      <button
-                        type="button"
-                        onClick={() => void handleArchive(lead.id)}
-                        className="text-zinc-600 underline"
-                      >
-                        Archive
-                      </button>
+                      <div className="flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          onClick={() => void handleResearch(lead.id)}
+                          className="text-zinc-600 underline"
+                        >
+                          Research
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleGenerateEmail(lead.id)}
+                          className="text-zinc-600 underline"
+                        >
+                          Generate+Send
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleArchive(lead.id)}
+                          className="text-zinc-600 underline"
+                        >
+                          Archive
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

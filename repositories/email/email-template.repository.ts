@@ -77,6 +77,13 @@ export class EmailTemplateRepository {
     },
   ) {
     const supabase = createSupabaseServiceClient();
+    if (input.isDefault) {
+      await supabase
+        .from("email_templates")
+        .update({ is_default: false })
+        .eq("tenant_id", tenantId)
+        .eq("is_default", true);
+    }
     const { data, error } = await supabase
       .from("email_templates")
       .insert({
@@ -90,5 +97,54 @@ export class EmailTemplateRepository {
       .single();
     if (error || !data) throw new DatabaseError(error?.message ?? "Failed");
     return mapTemplate(data as TemplateRow);
+  }
+
+  async update(
+    tenantId: TenantId,
+    templateId: string,
+    input: {
+      name?: string;
+      subjectTemplate?: string;
+      bodyTemplate?: string;
+      isDefault?: boolean;
+    },
+  ) {
+    const supabase = createSupabaseServiceClient();
+    if (input.isDefault) {
+      await supabase
+        .from("email_templates")
+        .update({ is_default: false })
+        .eq("tenant_id", tenantId)
+        .eq("is_default", true);
+    }
+    const payload: Record<string, unknown> = {};
+    if (input.name !== undefined) payload.name = input.name;
+    if (input.subjectTemplate !== undefined) {
+      payload.subject_template = input.subjectTemplate;
+    }
+    if (input.bodyTemplate !== undefined) {
+      payload.body_template = input.bodyTemplate;
+    }
+    if (input.isDefault !== undefined) payload.is_default = input.isDefault;
+
+    const { data, error } = await supabase
+      .from("email_templates")
+      .update(payload)
+      .eq("tenant_id", tenantId)
+      .eq("id", templateId)
+      .select("*")
+      .single();
+    if (error || !data) throw new DatabaseError(error?.message ?? "Failed");
+    return mapTemplate(data as TemplateRow);
+  }
+
+  async delete(tenantId: TenantId, templateId: string) {
+    const supabase = createSupabaseServiceClient();
+    const { error } = await supabase
+      .from("email_templates")
+      .delete()
+      .eq("tenant_id", tenantId)
+      .eq("id", templateId);
+    if (error) throw new DatabaseError(error.message);
   }
 }

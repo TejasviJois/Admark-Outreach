@@ -29,25 +29,3 @@ export class ResendEmailProvider implements EmailProvider {
     return { providerMessageId: data.id };
   }
 }
-
-/** Local/dev fallback that does not send real email. */
-export class LoggingEmailProvider implements EmailProvider {
-  async send(input: SendEmailInput): Promise<SendEmailResult> {
-    const id = `local-${Date.now()}`;
-    console.info(
-      JSON.stringify({
-        level: "info",
-        message: "Email send simulated",
-        context: { to: input.to, subject: input.subject, id },
-      }),
-    );
-    return { providerMessageId: id };
-  }
-}
-
-export function createEmailProvider(): EmailProvider {
-  if (process.env.RESEND_API_KEY && process.env.EMAIL_FROM) {
-    return new ResendEmailProvider();
-  }
-  return new LoggingEmailProvider();
-}

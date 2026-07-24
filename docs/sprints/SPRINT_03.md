@@ -9,9 +9,9 @@
 
 # Sprint Goal
 
-Complete the outreach loop and harden the system for production: AI company research, personalized email generation, email queueing and sending, inbound reply ingestion and AI classification, campaign tracking/analytics, and production stability/deployment readiness.
+Deliver the Hybrid Campaign Mail loop: CSV import → optional Cheerio crawl → company profile → campaign default template → template-engine email → queue → Titan SMTP. AI company research and Gemini personalization are **out of scope for active V1** (stub/UI only). Complete remaining production readiness items (replies, analytics, webhooks) without requiring OpenRouter.
 
-This sprint builds on Sprint 1 infrastructure and Sprint 2 lead/campaign basics. It does **not** rework foundation setup, auth scaffolding, lead import/CRUD patterns, or approved architecture. It does **not** add out-of-scope product surfaces (CRM, billing, LinkedIn, WhatsApp, team collaboration).
+This sprint builds on Sprint 1 infrastructure and Sprint 2 lead/campaign basics. It does **not** rework foundation setup or invent alternate architectures beyond the approved Hybrid Campaign Mail decision.
 
 ---
 

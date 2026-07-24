@@ -54,20 +54,30 @@ export const leadImportRowSchema = z.object({
   website: z
     .string()
     .trim()
-    .url()
     .optional()
     .or(z.literal(""))
-    .transform((v) => (v === "" ? undefined : v)),
+    .transform((v) => {
+      if (!v) return undefined;
+      const trimmed = v.trim();
+      if (!trimmed) return undefined;
+      return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    })
+    .pipe(z.string().url().optional()),
   firstName: z.string().trim().max(LEAD_NAME_MAX_LENGTH).optional(),
   lastName: z.string().trim().max(LEAD_NAME_MAX_LENGTH).optional(),
   email: z.string().trim().email(),
   linkedinUrl: z
     .string()
     .trim()
-    .url()
     .optional()
     .or(z.literal(""))
-    .transform((v) => (v === "" ? undefined : v)),
+    .transform((v) => {
+      if (!v) return undefined;
+      const trimmed = v.trim();
+      if (!trimmed) return undefined;
+      return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    })
+    .pipe(z.string().url().optional()),
   industry: z.string().trim().max(LEAD_NAME_MAX_LENGTH).optional(),
   country: z.string().trim().max(LEAD_NAME_MAX_LENGTH).optional(),
   employeeCount: z.coerce.number().int().positive().optional(),

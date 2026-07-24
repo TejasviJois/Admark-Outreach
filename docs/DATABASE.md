@@ -363,11 +363,84 @@ Central entity for the outreach platform.
 
 ---
 
+# companies
+
+Purpose
+
+Canonical company identity (website unique per tenant).
+
+## Columns
+
+- id (PK)
+- tenant_id (FK)
+- website (normalized, unique with tenant)
+- company_name
+- created_at
+- updated_at
+
+---
+
+# company_profiles
+
+Purpose
+
+Structured extraction from website crawl (or CSV-only when no website). Not LLM research.
+
+## Columns
+
+- id (PK)
+- tenant_id (FK)
+- company_id (FK, 1:1)
+- lead_id (FK, optional link for campaign membership)
+- company_name, industry, website, about
+- services (jsonb), team_size, location
+- technologies (jsonb), contact_email, linkedin_url, social_links (jsonb)
+- source_pages (jsonb)
+- profile_quality_score (0–100)
+- status (PENDING | RUNNING | COMPLETED | INCOMPLETE | FAILED)
+- extracted_at, created_at, updated_at
+
+---
+
+# crawl_jobs
+
+Purpose
+
+Crawl history for enrichment.
+
+## Columns
+
+- id (PK)
+- tenant_id (FK)
+- company_id (FK nullable)
+- lead_id (FK nullable)
+- website
+- status (PENDING | RUNNING | COMPLETED | FAILED | SKIPPED)
+- source_pages (jsonb)
+- error_message
+- started_at, finished_at, created_at
+
+---
+
+# campaigns (extensions)
+
+- default_template_id (FK → email_templates)
+
+---
+
+# leads (extensions)
+
+- company_id (FK → companies)
+
+Campaign membership remains on `leads` (documented as campaign_leads conceptually).
+
+---
+
 # company_research
 
 Purpose
 
-Stores AI-generated company research.
+Legacy LLM research table (superseded by company_profiles for Hybrid Campaign Mail). Keep for historical migrations; do not use for new enrichment.
 
 ---
 

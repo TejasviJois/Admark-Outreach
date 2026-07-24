@@ -2,22 +2,33 @@ import {
   NotFoundError,
   ValidationError,
 } from "@/lib/errors/domain-error";
-import { createAiProvider } from "@/providers/ai/gemini-ai.provider";
-import type { AiProvider } from "@/providers/ai/ai.provider";
-import { createEmailProvider } from "@/providers/email/resend-email.provider";
+import {
+  createGeminiPersonalizationProvider,
+  isAiPersonalizationEnabled,
+  type GeminiPersonalizationProvider,
+} from "@/providers/ai/gemini-personalization.provider";
+import {
+  createEmailProvider,
+  getEmailConnectionStatus,
+} from "@/providers/email/smtp-email.provider";
 import type { EmailProvider } from "@/providers/email/email.provider";
-import { AiTaskRepository } from "@/repositories/ai-task/ai-task.repository";
+import {
+  createTemplateEmailProvider,
+  type TemplateEmailProvider,
+} from "@/providers/email/template-email.provider";
+import { CampaignRepository } from "@/repositories/campaign/campaign.repository";
+import { CompanyProfileRepository } from "@/repositories/company-profile/company-profile.repository";
 import { EmailQueueRepository } from "@/repositories/email/email-queue.repository";
 import { EmailTemplateRepository } from "@/repositories/email/email-template.repository";
 import { GeneratedEmailRepository } from "@/repositories/email/generated-email.repository";
 import { SentEmailRepository } from "@/repositories/email/sent-email.repository";
 import { LeadRepository } from "@/repositories/lead/lead.repository";
-import { ResearchRepository } from "@/repositories/research/research.repository";
 import type {
   CreateEmailTemplateInput,
   GenerateEmailInput,
   QueueEmailInput,
   SendEmailInputBody,
+  UpdateEmailTemplateInput,
 } from "@/schemas/email/email.schema";
 import { AuthService } from "@/services/auth/auth.service";
 import { logger } from "@/utils/logger";
@@ -26,15 +37,20 @@ export class EmailService {
   constructor(
     private readonly authService: AuthService = new AuthService(),
     private readonly leadRepository: LeadRepository = new LeadRepository(),
-    private readonly researchRepository: ResearchRepository = new ResearchRepository(),
+    private readonly campaignRepository: CampaignRepository = new CampaignRepository(),
+    private readonly companyProfileRepository: CompanyProfileRepository = new CompanyProfileRepository(),
     private readonly templateRepository: EmailTemplateRepository = new EmailTemplateRepository(),
     private readonly generatedEmailRepository: GeneratedEmailRepository = new GeneratedEmailRepository(),
     private readonly queueRepository: EmailQueueRepository = new EmailQueueRepository(),
     private readonly sentEmailRepository: SentEmailRepository = new SentEmailRepository(),
-    private readonly aiTaskRepository: AiTaskRepository = new AiTaskRepository(),
-    private readonly aiProvider: AiProvider = createAiProvider(),
+    private readonly templateEmailProvider: TemplateEmailProvider = createTemplateEmailProvider(),
+    private readonly geminiProvider: GeminiPersonalizationProvider = createGeminiPersonalizationProvider(),
     private readonly emailProvider: EmailProvider = createEmailProvider(),
   ) {}
+
+  getConnectionStatus() {
+    return getEmailConnectionStatus();
+  }
 
   async listTemplates() {
     const profile = await this.authService.getCurrentUserProfile();
@@ -44,6 +60,27 @@ export class EmailService {
   async createTemplate(input: CreateEmailTemplateInput) {
     const profile = await this.authService.getCurrentUserProfile();
     return this.templateRepository.create(profile.tenant.id, input);
+  }
+
+  async updateTemplate(templateId: string, input: UpdateEmailTemplateInput) {
+    const profile = await this.authService.getCurrentUserProfile();
+    const existing = await this.templateRepository.findById(
+      profile.tenant.id,
+      templateId,
+    );
+    if (!existing) throw new NotFoundError("Email template not found");
+    return this.templateRepository.update(profile.tenant.id, templateId, input);
+  }
+
+  async deleteTemplate(templateId: string) {
+    const profile = await this.authService.getCurrentUserProfile();
+    const existing = await this.templateRepository.findById(
+      profile.tenant.id,
+      templateId,
+    );
+    if (!existing) throw new NotFoundError("Email template not found");
+    await this.templateRepository.delete(profile.tenant.id, templateId);
+    return { id: templateId };
   }
 
   async generateEmail(input: GenerateEmailInput) {
@@ -62,61 +99,77 @@ export class EmailService {
       if (existing) return existing;
     }
 
-    const research = await this.researchRepository.findByLeadId(
+    const companyProfile = await this.companyProfileRepository.findByLeadId(
       profile.tenant.id,
       input.leadId,
     );
-    if (!research || research.status !== "COMPLETED" || !research.summary) {
-      throw new ValidationError("Research missing. Generate research first.");
-    }
+
+    const campaign = await this.campaignRepository.findById(
+      profile.tenant.id,
+      lead.campaignId,
+    );
 
     const template = input.templateId
       ? await this.templateRepository.findById(
           profile.tenant.id,
           input.templateId,
         )
-      : await this.templateRepository.findDefault(profile.tenant.id);
+      : campaign?.defaultTemplateId
+        ? await this.templateRepository.findById(
+            profile.tenant.id,
+            campaign.defaultTemplateId,
+          )
+        : await this.templateRepository.findDefault(profile.tenant.id);
 
     if (!template) throw new NotFoundError("Email template not found");
 
-    const taskId = await this.aiTaskRepository.create({
-      tenantId: profile.tenant.id,
-      taskType: "EMAIL_GENERATION",
-      entityType: "lead",
-      entityId: lead.id,
+    const rendered = this.templateEmailProvider.render({
+      companyName:
+        companyProfile?.companyName ?? lead.companyName,
+      firstName: lead.firstName,
+      industry: companyProfile?.industry ?? lead.industry,
+      location: companyProfile?.location ?? lead.country,
+      services: companyProfile?.services ?? [],
+      subjectTemplate: template.subjectTemplate,
+      bodyTemplate: template.bodyTemplate,
     });
 
-    try {
-      const result = await this.aiProvider.generateEmail({
-        companyName: lead.companyName,
-        firstName: lead.firstName,
-        researchSummary: research.summary,
-        painPoints: research.painPoints,
-        opportunities: research.opportunities,
-        subjectTemplate: template.subjectTemplate,
-        bodyTemplate: template.bodyTemplate,
-      });
+    let subject = rendered.subject;
+    let body = rendered.body;
+    let generationModel = rendered.model;
+    const generationVersion = rendered.version;
 
-      const generated = await this.generatedEmailRepository.create(
-        profile.tenant.id,
-        {
-          leadId: lead.id,
-          templateId: template.id,
-          subject: result.output.subject,
-          body: result.output.body,
-          generationModel: result.model,
-          generationVersion: result.promptVersion,
-        },
-      );
-
-      await this.aiTaskRepository.complete(taskId, "COMPLETED");
-      return generated;
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Email generation failed";
-      await this.aiTaskRepository.complete(taskId, "FAILED", message);
-      throw error;
+    const quality = companyProfile?.profileQualityScore ?? 0;
+    if (isAiPersonalizationEnabled() && quality >= 40) {
+      try {
+        const personalized = await this.geminiProvider.personalize({
+          companyProfile: {
+            company: companyProfile?.companyName,
+            industry: companyProfile?.industry,
+            about: companyProfile?.about,
+            services: companyProfile?.services,
+            location: companyProfile?.location,
+            website: companyProfile?.website,
+          },
+          subject,
+          body,
+        });
+        subject = personalized.subject;
+        body = personalized.body;
+        generationModel = "gemini-stub";
+      } catch {
+        // Template email must never fail because AI is unavailable.
+      }
     }
+
+    return this.generatedEmailRepository.create(profile.tenant.id, {
+      leadId: lead.id,
+      templateId: template.id,
+      subject,
+      body,
+      generationModel,
+      generationVersion,
+    });
   }
 
   async queueEmail(input: QueueEmailInput) {
@@ -200,6 +253,13 @@ export class EmailService {
 
     const lead = await this.leadRepository.findById(tenantId, generated.leadId);
     if (!lead) throw new NotFoundError("Lead not found");
+
+    const connection = getEmailConnectionStatus();
+    if (!connection.configured) {
+      throw new ValidationError(
+        `Email not configured. Set Titan SMTP env vars: ${connection.missing.join(", ")}`,
+      );
+    }
 
     await this.queueRepository.markStatus(queue.id, "PROCESSING");
 

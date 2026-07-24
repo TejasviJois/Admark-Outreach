@@ -56,7 +56,7 @@ The architecture is designed around the engineering principles defined in the PR
  Repository Layer      Provider Abstractions      Domain Utilities
           │                     │                      │
           ▼                     ▼                      ▼
-   Supabase/PostgreSQL     Gemini / Email         Shared Libraries
+   Supabase/PostgreSQL     OpenRouter / Crawl / Email         Shared Libraries
           │
           ▼
    Supabase PostgreSQL
@@ -153,13 +153,16 @@ Abstracts external services.
 
 Initial Providers
 
-- Gemini Provider
-- Email Provider
+- Website Crawl Provider (Cheerio)
+- Template Email Provider (deterministic)
+- Gemini Personalization Provider (stub — future)
+- Email Provider (Titan SMTP)
 - Authentication Provider
 
 Future Providers
 
-- Multiple AI providers
+- Tech-stack / business enrichment / Maps / LinkedIn
+- Optional Gemini rewrite of template emails only
 - Multiple email providers
 - Storage providers
 - Analytics providers
@@ -199,7 +202,7 @@ Repositories  AI Provider   Email Provider
 
         ▼          ▼               ▼
 
-    PostgreSQL   Gemini        Email Service
+    PostgreSQL   OpenRouter        Email Service
 ```
 
 ---
@@ -285,59 +288,52 @@ PostgreSQL
 ## Research Flow
 
 ```
-Lead
+CSV Upload into Campaign
 
 ↓
 
-Research Service
+Validate & Normalize
 
 ↓
 
-Gemini Provider
+Has Website?
+
+├─ Yes → Website Crawl (Cheerio) → Extract About / Services / Contact / Location / Socials
+└─ No  → Skip Crawl
 
 ↓
 
-Structured Output
-
-↓
-
-Research Repository
+Build Structured Company Profile (+ quality score)
 
 ↓
 
 Database
 ```
+
+LLMs are not used to discover company facts.
 
 ---
 
 ## Email Generation
 
 ```
-Lead
+Company Profile
 
 ↓
 
-Research
+Load Campaign Default Template
 
 ↓
 
-Email Service
+Template Engine (fill placeholders)
 
 ↓
 
-Prompt Builder
+Optional AI Enhancement (future stub only)
 
 ↓
 
-Gemini Provider
-
-↓
-
-Generated Email
-
-↓
-
-Database
+Generated Email → Queue → Titan SMTP
 ```
 
 ---
@@ -381,7 +377,7 @@ Reply Service
 
 ↓
 
-Gemini Provider
+OpenRouter Provider
 
 ↓
 
@@ -429,9 +425,11 @@ Responsibilities
 
 Responsibilities
 
-- Trigger company research
-- Store structured research
-- Retry failures
+- Normalize company website URL
+- Crawl and extract About / Services / Contact (deterministic)
+- Call optional enrichment providers (tech stack, business data)
+- Store structured company profile
+- Update lead research/status fields
 
 ---
 
@@ -508,19 +506,16 @@ Repositories expose persistence operations only.
 
 Responsibilities
 
-- Generate research
-- Generate emails
-- Classify replies
+- Optional future: rewrite already-generated template emails from structured profile JSON
+- Classify replies (future)
 
 Current Implementation
 
-- Gemini
+- Template engine generates emails without AI
+- Gemini personalization provider is a stub (UI toggle only)
+- Titan SMTP sends mail
 
-Future
-
-- OpenAI
-- Anthropic
-- Azure AI
+Company fact discovery is handled by crawl providers, not the LLM.
 
 ---
 
@@ -670,47 +665,31 @@ Dashboard Refresh
 # 13. AI Workflow
 
 ```
-Lead
+CSV Lead
 
 ↓
 
-Research Prompt
+Deterministic Website Enrichment (Cheerio) if website present
 
 ↓
 
-Gemini
+Structured Company Profile
 
 ↓
 
-Structured Research
+Campaign Template + Template Engine
 
 ↓
 
-Email Prompt
+Generated Email (no AI required)
 
 ↓
 
-Gemini
+Queue → Titan SMTP
 
 ↓
 
-Generated Email
-
-↓
-
-Reply Received
-
-↓
-
-Classification Prompt
-
-↓
-
-Gemini
-
-↓
-
-Reply Classification
+(Future) Optional Gemini rewrite of template email only
 ```
 
 Every AI interaction produces structured output that is validated before persistence.

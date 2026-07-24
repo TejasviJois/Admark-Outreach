@@ -82,20 +82,42 @@ export function getPublicEnv(): PublicEnv {
   return cachedPublicEnv;
 }
 
-const aiEnvSchema = z.object({
-  GEMINI_API_KEY: z.string().min(1),
+const smtpEnvSchema = z.object({
+  SMTP_HOST: z.string().min(1),
+  SMTP_PORT: z.coerce.number().int().positive().default(465),
+  SMTP_SECURE: z
+    .string()
+    .optional()
+    .transform((value) => value !== "false" && value !== "0"),
+  SMTP_USER: z.string().min(1),
+  SMTP_PASS: z.string().min(1),
+  EMAIL_FROM: z.string().min(3),
 });
 
-export type AiEnv = z.infer<typeof aiEnvSchema>;
+export type SmtpEnv = z.infer<typeof smtpEnvSchema>;
 
-export function getAiEnv(): AiEnv {
-  const parsed = aiEnvSchema.safeParse({
-    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+export function hasSmtpConfig(): boolean {
+  return Boolean(
+    process.env.SMTP_HOST?.trim() &&
+      process.env.SMTP_USER?.trim() &&
+      process.env.SMTP_PASS?.trim() &&
+      process.env.EMAIL_FROM?.trim(),
+  );
+}
+
+export function getSmtpEnv(): SmtpEnv {
+  const parsed = smtpEnvSchema.safeParse({
+    SMTP_HOST: process.env.SMTP_HOST,
+    SMTP_PORT: process.env.SMTP_PORT || "465",
+    SMTP_SECURE: process.env.SMTP_SECURE ?? "true",
+    SMTP_USER: process.env.SMTP_USER,
+    SMTP_PASS: process.env.SMTP_PASS,
+    EMAIL_FROM: process.env.EMAIL_FROM,
   });
 
   if (!parsed.success) {
     throw new Error(
-      `Invalid AI environment configuration: ${formatEnvErrors(parsed.error)}`,
+      `Invalid SMTP environment configuration: ${formatEnvErrors(parsed.error)}`,
     );
   }
 
@@ -104,10 +126,16 @@ export function getAiEnv(): AiEnv {
 
 const emailEnvSchema = z.object({
   RESEND_API_KEY: z.string().min(1),
-  EMAIL_FROM: z.string().email(),
+  EMAIL_FROM: z.string().min(3),
 });
 
 export type EmailEnv = z.infer<typeof emailEnvSchema>;
+
+export function hasResendConfig(): boolean {
+  return Boolean(
+    process.env.RESEND_API_KEY?.trim() && process.env.EMAIL_FROM?.trim(),
+  );
+}
 
 export function getEmailEnv(): EmailEnv {
   const parsed = emailEnvSchema.safeParse({
@@ -122,6 +150,10 @@ export function getEmailEnv(): EmailEnv {
   }
 
   return parsed.data;
+}
+
+export function getEmailFrom(): string | null {
+  return process.env.EMAIL_FROM?.trim() || null;
 }
 
 const cronEnvSchema = z.object({

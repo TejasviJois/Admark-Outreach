@@ -10,10 +10,14 @@ import type {
 } from "@/types/lead";
 import type { TenantId } from "@/types/ids";
 
+const LEAD_SELECT =
+  "id, tenant_id, campaign_id, company_id, company_name, website, first_name, last_name, email, linkedin_url, industry, country, employee_count, lead_status, research_status, created_at, updated_at, deleted_at";
+
 type LeadRow = {
   id: string;
   tenant_id: string;
   campaign_id: string;
+  company_id: string | null;
   company_name: string;
   website: string | null;
   first_name: string | null;
@@ -35,6 +39,7 @@ function mapLead(row: LeadRow): LeadRecord {
     id: row.id,
     tenantId: row.tenant_id,
     campaignId: row.campaign_id,
+    companyId: row.company_id,
     companyName: row.company_name,
     website: row.website,
     firstName: row.first_name,
@@ -51,6 +56,10 @@ function mapLead(row: LeadRow): LeadRecord {
     deletedAt: row.deleted_at,
   };
 }
+
+export type LeadUpdateFields = UpdateLeadInput & {
+  companyId?: string | null;
+};
 
 export class LeadRepository implements BaseRepository {
   readonly name = "LeadRepository";
@@ -84,9 +93,7 @@ export class LeadRepository implements BaseRepository {
     const { data, error } = await supabase
       .from("leads")
       .insert(payload)
-      .select(
-        "id, tenant_id, campaign_id, company_name, website, first_name, last_name, email, linkedin_url, industry, country, employee_count, lead_status, research_status, created_at, updated_at, deleted_at",
-      );
+      .select(LEAD_SELECT);
 
     if (error || !data) {
       throw new DatabaseError(error?.message ?? "Failed to import leads");
@@ -102,9 +109,7 @@ export class LeadRepository implements BaseRepository {
     const supabase = createSupabaseServiceClient();
     const { data, error } = await supabase
       .from("leads")
-      .select(
-        "id, tenant_id, campaign_id, company_name, website, first_name, last_name, email, linkedin_url, industry, country, employee_count, lead_status, research_status, created_at, updated_at, deleted_at",
-      )
+      .select(LEAD_SELECT)
       .eq("tenant_id", tenantId)
       .eq("id", leadId)
       .is("deleted_at", null)
@@ -124,9 +129,7 @@ export class LeadRepository implements BaseRepository {
     const supabase = createSupabaseServiceClient();
     const { data, error } = await supabase
       .from("leads")
-      .select(
-        "id, tenant_id, campaign_id, company_name, website, first_name, last_name, email, linkedin_url, industry, country, employee_count, lead_status, research_status, created_at, updated_at, deleted_at",
-      )
+      .select(LEAD_SELECT)
       .eq("tenant_id", tenantId)
       .eq("email", email.toLowerCase())
       .is("deleted_at", null)
@@ -179,10 +182,7 @@ export class LeadRepository implements BaseRepository {
 
     let query = supabase
       .from("leads")
-      .select(
-        "id, tenant_id, campaign_id, company_name, website, first_name, last_name, email, linkedin_url, industry, country, employee_count, lead_status, research_status, created_at, updated_at, deleted_at",
-        { count: "exact" },
-      )
+      .select(LEAD_SELECT, { count: "exact" })
       .eq("tenant_id", tenantId)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
@@ -218,11 +218,12 @@ export class LeadRepository implements BaseRepository {
   async update(
     tenantId: TenantId,
     leadId: string,
-    input: UpdateLeadInput,
+    input: LeadUpdateFields,
   ): Promise<LeadRecord> {
     const supabase = createSupabaseServiceClient();
     const payload: Record<string, unknown> = {};
 
+    if (input.companyId !== undefined) payload.company_id = input.companyId;
     if (input.companyName !== undefined) payload.company_name = input.companyName;
     if (input.website !== undefined) payload.website = input.website;
     if (input.firstName !== undefined) payload.first_name = input.firstName;
@@ -245,9 +246,7 @@ export class LeadRepository implements BaseRepository {
       .eq("tenant_id", tenantId)
       .eq("id", leadId)
       .is("deleted_at", null)
-      .select(
-        "id, tenant_id, campaign_id, company_name, website, first_name, last_name, email, linkedin_url, industry, country, employee_count, lead_status, research_status, created_at, updated_at, deleted_at",
-      )
+      .select(LEAD_SELECT)
       .single();
 
     if (error || !data) {
@@ -268,9 +267,7 @@ export class LeadRepository implements BaseRepository {
       .eq("tenant_id", tenantId)
       .eq("id", leadId)
       .is("deleted_at", null)
-      .select(
-        "id, tenant_id, campaign_id, company_name, website, first_name, last_name, email, linkedin_url, industry, country, employee_count, lead_status, research_status, created_at, updated_at, deleted_at",
-      )
+      .select(LEAD_SELECT)
       .single();
 
     if (error || !data) {

@@ -17,13 +17,14 @@ confidenceScore must be a number between 0 and 1.`,
 };
 
 export const emailGenerationPrompt: PromptDefinition = {
-  version: "outreach.email_gen.v1.0",
+  version: "outreach.email_gen.v2.0",
   temperature: 0.3,
   topP: 0.9,
   system: `You are an outbound email copywriter for Admark.
-Write a concise personalized cold email using ONLY provided research and templates.
+Write a concise personalized cold email using ONLY the provided structured companyProfile and templates.
+Do not invent facts, clients, metrics, or services that are not in companyProfile.
 Output MUST be raw JSON only with keys: subject, body.
-Do not invent facts. Keep body under 180 words. No markdown.`,
+Keep body under 180 words. No markdown.`,
 };
 
 export const replyClassificationPrompt: PromptDefinition = {

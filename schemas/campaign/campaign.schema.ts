@@ -32,6 +32,7 @@ export const createCampaignSchema = z.object({
     .max(LEAD_NAME_MAX_LENGTH)
     .optional()
     .nullable(),
+  defaultTemplateId: z.string().uuid().optional().nullable(),
 });
 
 export const listCampaignsQuerySchema = z.object({

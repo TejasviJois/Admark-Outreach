@@ -7,7 +7,7 @@ export default function Home() {
       <p className="mt-3 text-zinc-600">
         Import and manage outreach leads by campaign.
       </p>
-      <div className="mt-8 flex gap-3">
+      <div className="mt-8 flex flex-wrap gap-3">
         <Link
           href="/auth/login"
           className="rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white"
@@ -19,6 +19,12 @@ export default function Home() {
           className="rounded border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-900"
         >
           Open leads
+        </Link>
+        <Link
+          href="/templates"
+          className="rounded border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-900"
+        >
+          Templates
         </Link>
       </div>
     </main>

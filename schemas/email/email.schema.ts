@@ -7,6 +7,11 @@ export const createEmailTemplateSchema = z.object({
   isDefault: z.boolean().optional(),
 });
 
+export const updateEmailTemplateSchema = createEmailTemplateSchema.partial().refine(
+  (value) => Object.keys(value).length > 0,
+  { message: "At least one field is required" },
+);
+
 export const generateEmailSchema = z.object({
   leadId: z.string().uuid(),
   templateId: z.string().uuid().optional(),
@@ -26,6 +31,7 @@ export const sendEmailSchema = z.object({
 });
 
 export type CreateEmailTemplateInput = z.infer<typeof createEmailTemplateSchema>;
+export type UpdateEmailTemplateInput = z.infer<typeof updateEmailTemplateSchema>;
 export type GenerateEmailInput = z.infer<typeof generateEmailSchema>;
 export type QueueEmailInput = z.infer<typeof queueEmailSchema>;
 export type SendEmailInputBody = z.infer<typeof sendEmailSchema>;

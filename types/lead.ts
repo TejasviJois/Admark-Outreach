@@ -36,6 +36,7 @@ export type LeadRecord = {
   id: string;
   tenantId: string;
   campaignId: string;
+  companyId: string | null;
   companyName: string;
   website: string | null;
   firstName: string | null;
@@ -60,6 +61,7 @@ export type CampaignRecord = {
   status: CampaignStatus;
   targetCountry: string | null;
   targetIndustry: string | null;
+  defaultTemplateId: string | null;
   createdAt: string;
   updatedAt: string;
 };

@@ -1,9 +1,11 @@
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors/domain-error";
+import { hasSmtpConfig } from "@/config/env";
 import { CampaignRepository } from "@/repositories/campaign/campaign.repository";
 import { LeadRepository } from "@/repositories/lead/lead.repository";
 import type { ListLeadsQuery, UpdateLeadInput } from "@/schemas/lead/lead.schema";
 import { leadImportRowSchema } from "@/schemas/lead/lead.schema";
 import { AuthService } from "@/services/auth/auth.service";
+import { OutreachPipelineService } from "@/services/outreach/outreach-pipeline.service";
 import type { LeadImportRow, LeadRecord } from "@/types/lead";
 import { parseCsv } from "@/utils/csv/parse-csv";
 import { logger } from "@/utils/logger";
@@ -15,6 +17,12 @@ export type LeadImportSummary = {
   importedLeadIds: string[];
   duplicateEmails: string[];
   invalidRows: Array<{ rowNumber: number; errors: string }>;
+  pipelineResults?: Array<{
+    leadId: string;
+    profileStatus: string;
+    sent?: boolean;
+    error?: string;
+  }>;
 };
 
 const HEADER_ALIASES: Record<string, keyof LeadImportRow> = {
@@ -41,6 +49,7 @@ export class LeadService {
     private readonly authService: AuthService = new AuthService(),
     private readonly leadRepository: LeadRepository = new LeadRepository(),
     private readonly campaignRepository: CampaignRepository = new CampaignRepository(),
+    private readonly outreachPipeline: OutreachPipelineService = new OutreachPipelineService(),
   ) {}
 
   async listLeads(query: ListLeadsQuery) {
@@ -127,6 +136,13 @@ export class LeadService {
       throw new NotFoundError("Campaign not found");
     }
 
+    if (!campaign.defaultTemplateId) {
+      const defaultTemplateNote =
+        "Campaign has no default template. Assign one so the mail pipeline can run after import.";
+      // Allow import to store leads, but skip pipeline until template is set.
+      logger.info(defaultTemplateNote, { campaignId });
+    }
+
     const { headers, rows } = parseCsv(fileContent);
     const normalizedHeaders = headers.map((header) =>
       header.trim().toLowerCase().replace(/\s+/g, "_"),
@@ -209,10 +225,19 @@ export class LeadService {
       toImport,
     );
 
+    let pipelineResults: LeadImportSummary["pipelineResults"];
+    if (imported.length > 0 && campaign.defaultTemplateId) {
+      pipelineResults = await this.outreachPipeline.processImportedLeads(
+        imported.map((lead) => lead.id),
+        { sendImmediately: hasSmtpConfig() },
+      );
+    }
+
     logger.info("Lead import completed", {
       importedCount: imported.length,
       skippedDuplicateCount: duplicateEmails.length,
       invalidRowCount: invalidRows.length,
+      pipelineProcessed: pipelineResults?.length ?? 0,
     });
 
     return {
@@ -222,6 +247,7 @@ export class LeadService {
       importedLeadIds: imported.map((lead) => lead.id),
       duplicateEmails,
       invalidRows,
+      pipelineResults,
     };
   }
 }

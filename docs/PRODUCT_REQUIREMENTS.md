@@ -57,8 +57,10 @@ This document defines the product requirements for **Admark**, an autonomous, li
 
 ### 3.2 Dynamic Personalization Engine
 
-* Cold emails dynamically insert verified company details, recent news, or role-specific pain points using pre-configured AI generation parameters.
-* Variable fallback logic ensures zero broken template tags (e.g., fallback to "your team" if company name is missing).
+* **V1 (Hybrid Campaign Mail):** Each campaign has a **default email template**. After CSV import, the system crawls websites when present, builds a company profile, fills template placeholders (`{{company_name}}`, `{{industry}}`, `{{location}}`, `{{service_1}}`, `{{service_2}}`, `{{first_name}}`), queues, and sends via **Titan SMTP**.
+* Variable fallback: missing placeholders render as empty strings (never broken tags).
+* **AI enhancement** is optional and deferred — a UI toggle exists but does not change V1 send behavior. AI never discovers company facts from the web.
+* Sending mailbox: Titan (`info@admarkdigitals.com`) via SMTP credentials in environment config.
 
 ---
 

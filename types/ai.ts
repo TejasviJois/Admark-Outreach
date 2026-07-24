@@ -56,9 +56,7 @@ export type ResearchGenerationInput = {
 export type EmailGenerationInput = {
   companyName: string;
   firstName: string | null;
-  researchSummary: string;
-  painPoints: string[];
-  opportunities: string[];
+  companyProfile: Record<string, unknown>;
   subjectTemplate: string;
   bodyTemplate: string;
 };

@@ -5,6 +5,9 @@ import type { CreateCampaignInput } from "@/schemas/campaign/campaign.schema";
 import type { CampaignRecord, CampaignStatus } from "@/types/lead";
 import type { TenantId } from "@/types/ids";
 
+const CAMPAIGN_SELECT =
+  "id, tenant_id, name, description, status, target_country, target_industry, default_template_id, created_at, updated_at";
+
 type CampaignRow = {
   id: string;
   tenant_id: string;
@@ -13,6 +16,7 @@ type CampaignRow = {
   status: CampaignStatus;
   target_country: string | null;
   target_industry: string | null;
+  default_template_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -26,6 +30,7 @@ function mapCampaign(row: CampaignRow): CampaignRecord {
     status: row.status,
     targetCountry: row.target_country,
     targetIndustry: row.target_industry,
+    defaultTemplateId: row.default_template_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -47,11 +52,10 @@ export class CampaignRepository implements BaseRepository {
         description: input.description ?? null,
         target_country: input.targetCountry ?? null,
         target_industry: input.targetIndustry ?? null,
+        default_template_id: input.defaultTemplateId ?? null,
         status: "DRAFT",
       })
-      .select(
-        "id, tenant_id, name, description, status, target_country, target_industry, created_at, updated_at",
-      )
+      .select(CAMPAIGN_SELECT)
       .single();
 
     if (error || !data) {
@@ -68,9 +72,7 @@ export class CampaignRepository implements BaseRepository {
     const supabase = createSupabaseServiceClient();
     const { data, error } = await supabase
       .from("campaigns")
-      .select(
-        "id, tenant_id, name, description, status, target_country, target_industry, created_at, updated_at",
-      )
+      .select(CAMPAIGN_SELECT)
       .eq("tenant_id", tenantId)
       .eq("id", campaignId)
       .maybeSingle();
@@ -80,6 +82,33 @@ export class CampaignRepository implements BaseRepository {
     }
 
     return data ? mapCampaign(data as CampaignRow) : null;
+  }
+
+  async update(
+    tenantId: TenantId,
+    campaignId: string,
+    input: { defaultTemplateId?: string | null; name?: string },
+  ): Promise<CampaignRecord> {
+    const supabase = createSupabaseServiceClient();
+    const payload: Record<string, unknown> = {};
+    if (input.defaultTemplateId !== undefined) {
+      payload.default_template_id = input.defaultTemplateId;
+    }
+    if (input.name !== undefined) payload.name = input.name;
+
+    const { data, error } = await supabase
+      .from("campaigns")
+      .update(payload)
+      .eq("tenant_id", tenantId)
+      .eq("id", campaignId)
+      .select(CAMPAIGN_SELECT)
+      .single();
+
+    if (error || !data) {
+      throw new DatabaseError(error?.message ?? "Failed to update campaign");
+    }
+
+    return mapCampaign(data as CampaignRow);
   }
 
   async findMany(
@@ -96,10 +125,7 @@ export class CampaignRepository implements BaseRepository {
 
     let query = supabase
       .from("campaigns")
-      .select(
-        "id, tenant_id, name, description, status, target_country, target_industry, created_at, updated_at",
-        { count: "exact" },
-      )
+      .select(CAMPAIGN_SELECT, { count: "exact" })
       .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false })
       .range(from, to);

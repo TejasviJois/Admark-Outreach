@@ -1,0 +1,3 @@
+company_name,website,first_name,last_name,email,industry,country,employee_count
+Acme Corp,https://acme.example,Ada,Lovelace,ada@acme.example,Software,US,50
+Beta LLC,https://beta.example,Alan,Turing,alan@beta.example,AI,UK,25
